@@ -28,12 +28,12 @@ export default function Home() {
     const formData = new FormData(event.currentTarget)
 
     try {
-      const { buffer, totalCODAfterCalculation, customerCode, isWhitelisted, clientName } = await processCSV(formData)
+      const { buffer, totalCODAfterCalculation, customerCode, isWhitelisted, clientName, fileName } = await processCSV(formData)
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = "processed_data.xlsx"
+      a.download = fileName
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

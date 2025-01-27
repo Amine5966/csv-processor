@@ -44,6 +44,18 @@ export async function processCSV(formData: FormData) {
     throw new Error("No file uploaded")
   }
 
+  // Get the original filename and parse its components
+  const originalFileName = file.name
+  console.log("Original filename:", originalFileName)
+
+  // Create output filename with similar pattern but for processed data
+  const fileName = originalFileName
+    .replace('.csv', '') // Remove .csv extension
+    .replace('invoice', 'processed') // Replace 'invoice' with 'processed'
+    .concat('.xlsx') // Add .xlsx extension
+
+  console.log("Generated filename:", fileName)
+
   const content = await file.text()
   console.log("Raw content first 500 chars:", content.substring(0, 500))
 
@@ -85,7 +97,8 @@ export async function processCSV(formData: FormData) {
       totalCODAfterCalculation: 0,
       customerCode,
       isWhitelisted: true,
-      clientName: WHITELIST_CLIENTS[customerCode]
+      clientName: WHITELIST_CLIENTS[customerCode],
+      fileName
     }
   }
 
@@ -179,7 +192,8 @@ export async function processCSV(formData: FormData) {
     totalCODAfterCalculation,
     customerCode,
     isWhitelisted: false,
-    clientName: null
+    clientName: null,
+    fileName
   }
 }
 
