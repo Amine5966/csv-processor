@@ -7,6 +7,37 @@ interface RowData {
   [key: string]: string
 }
 
+// Define the whitelist type for better type safety
+type WhitelistClients = {
+  [key: string]: string;
+}
+
+// Add the client whitelist at the top of the file
+const WHITELIST_CLIENTS: WhitelistClients = {
+  "520": "FACES",
+  "704": "LC WAIKIKI",
+  "565": "Marwa",
+  "1244": "Marjane Mall",
+  "1124": "Excellence",
+  "882": "KS TECHNOLOGY",
+  "1702": "Mylerz",
+  "1814": "KITEA.COM",
+  "1831": "BAM MA",
+  "1860": "GSM Al Maghrib",
+  "1063": "Fulfillment Bridge",
+  "2062": "IKEA MAROC",
+  "2338": "Lecoinintime Maroc",
+  "2394": "CITYMALL",
+  "2083": "vapeindustry",
+  "2403": "COIN DES PRIX",
+  "965": "EQUICK",
+  "778": "1MOMENT",
+  "1109": "IMILE DELIVERY",
+  "2923": "WWW.AMED.MA",
+  "2970": "AUBRILLANT",
+  "2989": "TIGHT AND SLEEK"
+}
+
 export async function processCSV(formData: FormData) {
   const file = formData.get("file") as File
   if (!file) {
@@ -22,6 +53,43 @@ export async function processCSV(formData: FormData) {
   const columnNames = Object.keys(data[0] || {})
   console.log("Available columns:", columnNames)
 
+  // Early check for customer code - check both possible column names
+  const firstRow = data[0] as RowData
+  let customerCode = firstRow["Customer Code"] || firstRow["﻿Customer Code"]
+  
+  if (!customerCode) {
+    throw new Error("Customer Code not found in CSV")
+  }
+
+  // Clean the customer code by removing any hidden characters and trimming whitespace
+  customerCode = customerCode.trim().replace(/^\ufeff/, '')
+
+  console.log("Raw customer code:", firstRow["Customer Code"] || firstRow["Customer Code"])
+  console.log("Cleaned customer code:", customerCode)
+  console.log("Customer code type:", typeof customerCode)
+  console.log("Whitelist keys:", Object.keys(WHITELIST_CLIENTS))
+  console.log("Is in whitelist?", customerCode in WHITELIST_CLIENTS)
+  
+  // If customer is in whitelist, just convert to Excel without modifications
+  if (customerCode in WHITELIST_CLIENTS) {
+    console.log(`Whitelisted client found: ${WHITELIST_CLIENTS[customerCode]}. Skipping calculations.`)
+    
+    // Convert directly to Excel without adding any new columns
+    const worksheet = XLSX.utils.json_to_sheet(data)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Data")
+    
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
+    return {
+      buffer: excelBuffer,
+      totalCODAfterCalculation: 0,
+      customerCode,
+      isWhitelisted: true,
+      clientName: WHITELIST_CLIENTS[customerCode]
+    }
+  }
+
+  // If not in whitelist, proceed with the original calculation logic
   let totalCODAfterCalculation = 0
 
   const processedData = data.map((row) => {
@@ -59,10 +127,6 @@ export async function processCSV(formData: FormData) {
       "COD Amount After Calculation": codAmountAfterCalculation.toFixed(2),
     }
   })
-
-  // Get the customer code from the first row, using type assertion
-  const firstRow = processedData[0] as RowData
-  const customerCode = firstRow?.["Customer Code"] || firstRow?.["﻿Customer Code"] || "N/A"
 
   const worksheet = XLSX.utils.json_to_sheet(processedData)
   const workbook = XLSX.utils.book_new()
@@ -114,6 +178,8 @@ export async function processCSV(formData: FormData) {
     buffer: excelBuffer,
     totalCODAfterCalculation,
     customerCode,
+    isWhitelisted: false,
+    clientName: null
   }
 }
 

@@ -12,6 +12,8 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [totalCODAfterCalculation, setTotalCODAfterCalculation] = useState<number | null>(null)
   const [customerCode, setCustomerCode] = useState<string | null>(null)
+  const [isWhitelisted, setIsWhitelisted] = useState(false)
+  const [clientName, setClientName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -19,12 +21,14 @@ export default function Home() {
     setIsProcessing(true)
     setTotalCODAfterCalculation(null)
     setCustomerCode(null)
+    setIsWhitelisted(false)
+    setClientName(null)
     setError(null)
 
     const formData = new FormData(event.currentTarget)
 
     try {
-      const { buffer, totalCODAfterCalculation, customerCode } = await processCSV(formData)
+      const { buffer, totalCODAfterCalculation, customerCode, isWhitelisted, clientName } = await processCSV(formData)
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -36,6 +40,8 @@ export default function Home() {
       URL.revokeObjectURL(url)
       setTotalCODAfterCalculation(totalCODAfterCalculation)
       setCustomerCode(customerCode)
+      setIsWhitelisted(isWhitelisted)
+      setClientName(clientName)
     } catch (error) {
       console.error("Error processing file:", error)
       setError(error instanceof Error ? error.message : "An error occurred while processing the file")
@@ -71,12 +77,22 @@ export default function Home() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          {(totalCODAfterCalculation !== null || customerCode) && (
+          {customerCode && (
             <Alert className="mt-4">
               <AlertTitle>Processing Complete</AlertTitle>
               <AlertDescription className="space-y-2">
-                <p>Total COD After Calculation: {totalCODAfterCalculation?.toFixed(2)} MAD</p>
-                <p>Customer Code: {customerCode}</p>
+                {isWhitelisted ? (
+                  <>
+                    <p>Customer Code: {customerCode}</p>
+                    <p>Client Name: {clientName}</p>
+                    <p className="font-medium text-blue-600">This is a whitelisted client - No calculations applied</p>
+                  </>
+                ) : (
+                  <>
+                    <p>Customer Code: {customerCode}</p>
+                    <p>Total COD After Calculation: {totalCODAfterCalculation?.toFixed(2)} MAD</p>
+                  </>
+                )}
               </AlertDescription>
             </Alert>
           )}
