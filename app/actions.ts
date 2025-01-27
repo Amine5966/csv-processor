@@ -46,26 +46,14 @@ export async function processCSV(formData: FormData) {
 
   // Get the original filename and parse its components
   const originalFileName = file.name
-  console.log("Original filename:", originalFileName)
-
-  // Create output filename with similar pattern but for processed data
   const fileName = originalFileName
     .replace('.csv', '') // Remove .csv extension
     .replace('invoice', 'processed') // Replace 'invoice' with 'processed'
     .concat('.xlsx') // Add .xlsx extension
 
-  console.log("Generated filename:", fileName)
-
   const content = await file.text()
-  console.log("Raw content first 500 chars:", content.substring(0, 500))
-
   const { data } = parse<RowData>(content, { header: true })
-  console.log("First row sample:", data[0])
 
-  const columnNames = Object.keys(data[0] || {})
-  console.log("Available columns:", columnNames)
-
-  // Early check for customer code - check both possible column names
   const firstRow = data[0] as RowData
   let customerCode = firstRow["Customer Code"] || firstRow["﻿Customer Code"]
   
@@ -76,17 +64,8 @@ export async function processCSV(formData: FormData) {
   // Clean the customer code by removing any hidden characters and trimming whitespace
   customerCode = customerCode.trim().replace(/^\ufeff/, '')
 
-  console.log("Raw customer code:", firstRow["Customer Code"] || firstRow["Customer Code"])
-  console.log("Cleaned customer code:", customerCode)
-  console.log("Customer code type:", typeof customerCode)
-  console.log("Whitelist keys:", Object.keys(WHITELIST_CLIENTS))
-  console.log("Is in whitelist?", customerCode in WHITELIST_CLIENTS)
-  
   // If customer is in whitelist, just convert to Excel without modifications
   if (customerCode in WHITELIST_CLIENTS) {
-    console.log(`Whitelisted client found: ${WHITELIST_CLIENTS[customerCode]}. Skipping calculations.`)
-    
-    // Convert directly to Excel without adding any new columns
     const worksheet = XLSX.utils.json_to_sheet(data)
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data")
@@ -155,26 +134,17 @@ export async function processCSV(formData: FormData) {
     const nextColumnLetter = XLSX.utils.encode_col(codAmountAfterCalculationColumn + 1)
     const lastRow = processedData.length + 1
 
-    console.log('Setting title at:', `${columnLetter}${lastRow}`)
-    console.log('Setting total at:', `${nextColumnLetter}${lastRow}`)
-    console.log('Total value:', totalCODAfterCalculation)
-
-    // Add the title 'COD Amount After Calculation' in the current column
     worksheet[`${columnLetter}${lastRow}`] = { t: "s", v: "COD Amount After Calculation" }
-
-    // Add the total in the next column (adjacent cell)
     worksheet[`${nextColumnLetter}${lastRow}`] = {
       t: "n",
       v: totalCODAfterCalculation,
       z: "#,##0.00"
     }
 
-    // Adjust column widths for both columns
     if (!worksheet["!cols"]) worksheet["!cols"] = []
     worksheet["!cols"][codAmountAfterCalculationColumn] = { wch: 25 }
     worksheet["!cols"][codAmountAfterCalculationColumn + 1] = { wch: 15 }
 
-    // Update the worksheet range to include our new cells
     const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1')
     const lastCol = Math.max(range.e.c, codAmountAfterCalculationColumn + 1)
     const lastRowNum = Math.max(range.e.r, lastRow - 1)
@@ -182,8 +152,6 @@ export async function processCSV(formData: FormData) {
       s: { c: 0, r: 0 },
       e: { c: lastCol, r: lastRowNum }
     })
-
-    console.log('Updated worksheet range:', worksheet['!ref'])
   }
 
   const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
