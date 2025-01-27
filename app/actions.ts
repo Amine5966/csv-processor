@@ -60,8 +60,9 @@ export async function processCSV(formData: FormData) {
     }
   })
 
-  // Get the customer code from the first row
-  const customerCode = processedData[0]?.["Customer Code"] || processedData[0]?.["﻿Customer Code"] || "N/A"
+  // Get the customer code from the first row, using type assertion
+  const firstRow = processedData[0] as RowData
+  const customerCode = firstRow?.["Customer Code"] || firstRow?.["﻿Customer Code"] || "N/A"
 
   const worksheet = XLSX.utils.json_to_sheet(processedData)
   const workbook = XLSX.utils.book_new()
