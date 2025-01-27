@@ -1,6 +1,6 @@
 "use server"
 
-import { parse, ParseResult } from "papaparse"
+import { parse } from "papaparse"
 import * as XLSX from "xlsx"
 
 interface RowData {
@@ -24,7 +24,7 @@ export async function processCSV(formData: FormData) {
 
   let totalCODAfterCalculation = 0
 
-  const processedData = data.map((row, index) => {
+  const processedData = data.map((row) => {
     const freightCharge = Number.parseFloat(row["Freight Charge"] || row["﻿Freight Charge"] || "0")
     const excessWeightCharge = Number.parseFloat(row["Excess Weight Charge"] || row["﻿Excess Weight Charge"] || "0")
     const monthlyOrderCharge = Number.parseFloat(row["Monthly Order Charge"] || row["﻿Monthly Order Charge"] || "0")
