@@ -1,18 +1,15 @@
 "use server"
 
-import { parse } from "papaparse"
 import * as XLSX from "xlsx"
 
 interface RowData {
   [key: string]: string
 }
 
-// Define the whitelist type for better type safety
 type WhitelistClients = {
   [key: string]: string;
 }
 
-// Add the client whitelist at the top of the file
 const WHITELIST_CLIENTS: WhitelistClients = {
   "520": "FACES",
   "704": "LC WAIKIKI",
@@ -38,130 +35,88 @@ const WHITELIST_CLIENTS: WhitelistClients = {
   "2989": "TIGHT AND SLEEK"
 }
 
-export async function processCSV(formData: FormData) {
-  const file = formData.get("file") as File
-  if (!file) {
-    throw new Error("No file uploaded")
-  }
-
-  // Get the original filename and parse its components
-  const originalFileName = file.name
-  const fileName = originalFileName
-    .replace('.csv', '') // Remove .csv extension
-    .replace('invoice', 'processed') // Replace 'invoice' with 'processed'
-    .concat('.xlsx') // Add .xlsx extension
-
-  const content = await file.text()
-  const { data } = parse<RowData>(content, { header: true })
-
-  const firstRow = data[0] as RowData
-  let customerCode = firstRow["Customer Code"] || firstRow["﻿Customer Code"]
-  
-  if (!customerCode) {
-    throw new Error("Customer Code not found in CSV")
-  }
-
-  // Clean the customer code by removing any hidden characters and trimming whitespace
-  customerCode = customerCode.trim().replace(/^\ufeff/, '')
-
-  // If customer is in whitelist, just convert to Excel without modifications
-  if (customerCode in WHITELIST_CLIENTS) {
-    const worksheet = XLSX.utils.json_to_sheet(data)
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Data")
-    
-    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
-    return {
-      buffer: excelBuffer,
-      totalCODAfterCalculation: 0,
-      customerCode,
-      isWhitelisted: true,
-      clientName: WHITELIST_CLIENTS[customerCode],
-      fileName
-    }
-  }
-
-  // If not in whitelist, proceed with the original calculation logic
-  let totalCODAfterCalculation = 0
-
-  const processedData = data.map((row) => {
-    const freightCharge = Number.parseFloat(row["Freight Charge"] || row["﻿Freight Charge"] || "0")
-    const excessWeightCharge = Number.parseFloat(row["Excess Weight Charge"] || row["﻿Excess Weight Charge"] || "0")
-    const monthlyOrderCharge = Number.parseFloat(row["Monthly Order Charge"] || row["﻿Monthly Order Charge"] || "0")
-    const monthlyExcessWeightCharge = Number.parseFloat(
-      row["Monthly Excess Weight Charge"] || row["﻿Monthly Excess Weight Charge"] || "0",
-    )
-    const codCharges = Number.parseFloat(row["COD Charges"] || row["﻿COD Charges"] || "0")
-    const rtoCharge = Number.parseFloat(row["RTO Charge"] || row["﻿RTO Charge"] || "0")
-    const insuranceCharge = Number.parseFloat(row["Insurance Charge"] || row["﻿Insurance Charge"] || "0")
-    const discountCharge = Number.parseFloat(row["Discount Charge"] || row["﻿Discount Charge"] || "0")
-    const vatCharge = Number.parseFloat(row["VAT Charge"] || row["﻿VAT Charge"] || "0")
-
-    const totalFreight =
-      freightCharge +
-      excessWeightCharge +
-      monthlyOrderCharge +
-      monthlyExcessWeightCharge +
-      codCharges +
-      rtoCharge +
-      insuranceCharge +
-      discountCharge +
-      vatCharge
-
-    const codAmount = Number.parseFloat(row["COD amount"] || row["﻿COD amount"] || "0")
-    const codAmountAfterCalculation = codAmount - totalFreight
-
-    totalCODAfterCalculation += codAmountAfterCalculation
-
-    return {
-      ...row,
-      "Total Freight": totalFreight.toFixed(2),
-      "COD Amount After Calculation": codAmountAfterCalculation.toFixed(2),
-    }
-  })
-
-  const worksheet = XLSX.utils.json_to_sheet(processedData)
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Processed Data")
-
-  // Find the 'COD Amount After Calculation' column
-  const codAmountAfterCalculationColumn = Object.keys(processedData[0]).findIndex(
-    (key) => key === "COD Amount After Calculation",
-  )
-
-  if (codAmountAfterCalculationColumn !== -1) {
-    const columnLetter = XLSX.utils.encode_col(codAmountAfterCalculationColumn)
-    const nextColumnLetter = XLSX.utils.encode_col(codAmountAfterCalculationColumn + 1)
-    const lastRow = processedData.length + 1
-
-    worksheet[`${columnLetter}${lastRow}`] = { t: "s", v: "COD Amount After Calculation" }
-    worksheet[`${nextColumnLetter}${lastRow}`] = {
-      t: "n",
-      v: totalCODAfterCalculation,
-      z: "#,##0.00"
-    }
-
-    if (!worksheet["!cols"]) worksheet["!cols"] = []
-    worksheet["!cols"][codAmountAfterCalculationColumn] = { wch: 25 }
-    worksheet["!cols"][codAmountAfterCalculationColumn + 1] = { wch: 15 }
-
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1')
-    const lastCol = Math.max(range.e.c, codAmountAfterCalculationColumn + 1)
-    const lastRowNum = Math.max(range.e.r, lastRow - 1)
-    worksheet['!ref'] = XLSX.utils.encode_range({
-      s: { c: 0, r: 0 },
-      e: { c: lastCol, r: lastRowNum }
-    })
-  }
-
-  const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" })
-  return {
-    buffer: excelBuffer,
-    totalCODAfterCalculation,
-    customerCode,
-    isWhitelisted: false,
-    clientName: null,
-    fileName
-  }
+interface CustomerSummary {
+  customerCode: string;
+  totalCODAfterCalculation: number;
+  isWhitelisted: boolean;
+  clientName: string | null;
 }
 
+export async function processExcel(formData: FormData) {
+  const file = formData.get("file") as File
+  if (!file) throw new Error("No file uploaded")
+
+  const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+  const originalFileName = `generated_invoices_${today}.xlsx`; // New filename format
+
+  const arrayBuffer = await file.arrayBuffer()
+  const workbook = XLSX.read(arrayBuffer, { type: "buffer" })
+
+  // Assume the first sheet is the one to process
+  const sheetName = workbook.SheetNames[0]
+  const worksheet = workbook.Sheets[sheetName]
+  const data: RowData[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+  // Extract headers and rows
+  const headers = data[0] as string[]
+  const rows = data.slice(1).map(row => {
+    const rowData: RowData = {}
+    headers.forEach((header, index) => {
+      rowData[header] = row[index]?.toString() || ""
+    })
+    return rowData
+  })
+
+  // Group data by Customer Code
+  const groupedData: { [key: string]: RowData[] } = {}
+  rows.forEach(row => {
+    let customerCode = (row["Customer Code"] || row["﻿Customer Code"]).trim().replace(/^\ufeff/, '')
+    if (!groupedData[customerCode]) groupedData[customerCode] = []
+    groupedData[customerCode].push(row)
+  })
+
+  const outputWorkbook = XLSX.utils.book_new()
+  const summaries: CustomerSummary[] = []
+
+  for (const [customerCode, rows] of Object.entries(groupedData)) {
+    const isWhitelisted = customerCode in WHITELIST_CLIENTS
+    const clientName = WHITELIST_CLIENTS[customerCode] || null
+    let totalCODAfterCalculation = 0
+
+    const processedRows = rows.map(row => {
+      if (isWhitelisted) return { ...row } // No modifications for whitelisted
+
+      // Calculate Total Freight
+      const freightCharge = parseFloat(row["Freight Charge"] || row["﻿Freight Charge"] || "0")
+      const excessWeightCharge = parseFloat(row["Excess Weight Charge"] || row["﻿Excess Weight Charge"] || "0")
+      const monthlyOrderCharge = parseFloat(row["Monthly Order Charge"] || row["﻿Monthly Order Charge"] || "0")
+      const monthlyExcessWeightCharge = parseFloat(row["Monthly Excess Weight Charge"] || row["﻿Monthly Excess Weight Charge"] || "0")
+      const codCharges = parseFloat(row["COD Charges"] || row["﻿COD Charges"] || "0")
+      const rtoCharge = parseFloat(row["RTO Charge"] || row["﻿RTO Charge"] || "0")
+      const insuranceCharge = parseFloat(row["Insurance Charge"] || row["﻿Insurance Charge"] || "0")
+      const discountCharge = parseFloat(row["Discount Charge"] || row["﻿Discount Charge"] || "0")
+      const vatCharge = parseFloat(row["VAT Charge"] || row["﻿VAT Charge"] || "0")
+
+      const totalFreight = freightCharge + excessWeightCharge + monthlyOrderCharge + monthlyExcessWeightCharge + codCharges + rtoCharge + insuranceCharge + discountCharge + vatCharge
+
+      // Calculate COD total (not added to Excel)
+      const codAmount = parseFloat(row["COD amount"] || row["﻿COD amount"] || "0")
+      totalCODAfterCalculation += codAmount - totalFreight
+
+      return { ...row, "Total Freight": totalFreight.toFixed(2), "COD Amount After Calculation": (codAmount - totalFreight).toFixed(2) }
+    })
+
+    summaries.push({
+      customerCode,
+      totalCODAfterCalculation: isWhitelisted ? 0 : totalCODAfterCalculation,
+      isWhitelisted,
+      clientName
+    })
+
+    const outputWorksheet = XLSX.utils.json_to_sheet(processedRows)
+    XLSX.utils.book_append_sheet(outputWorkbook, outputWorksheet, customerCode.slice(0, 31)) // Sheet name limit
+  }
+
+  const excelBuffer = XLSX.write(outputWorkbook, { bookType: "xlsx", type: "array" })
+  return { buffer: excelBuffer, summaries, fileName: originalFileName }
+}
