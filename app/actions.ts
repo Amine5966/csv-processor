@@ -38,7 +38,6 @@ const WHITELIST_CLIENTS: WhitelistClients = {
 // Columns to exclude from the output
 const EXCLUDED_COLUMNS = [
   "Final Price",
-  "Customer Name",
   "Shipper Tracking Number",
   "Monthly Order Charge",
   "Monthly Excess Weight Charge",
