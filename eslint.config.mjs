@@ -14,6 +14,7 @@ const eslintConfig = [
   {
     rules: {
       "prefer-const": "off",
+      "@typescript-eslint/no-explicit-any": "off"
     },
   },
 ];

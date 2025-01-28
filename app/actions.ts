@@ -38,6 +38,7 @@ const WHITELIST_CLIENTS: WhitelistClients = {
 // Columns to exclude from the output
 const EXCLUDED_COLUMNS = [
   "Final Price",
+  "Customer Name",
   "Shipper Tracking Number",
   "Monthly Order Charge",
   "Monthly Excess Weight Charge",
@@ -58,10 +59,13 @@ export async function processExcel(formData: FormData) {
 
   const sheetName = workbook.SheetNames[0]
   const worksheet = workbook.Sheets[sheetName]
-  const data: RowData[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
 
-  const headers = data[0] as unknown as string[]
-  const rows = data.slice(1)
+  // Read as array of arrays first
+  const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][]
+
+  // Properly type the headers and rows
+  const headers = rawData[0].map((h) => String(h))
+  const rows = rawData.slice(1)
 
   // Filter out excluded columns from headers
   const filteredHeaders = headers.filter((header) => !EXCLUDED_COLUMNS.includes(header))
@@ -76,7 +80,7 @@ export async function processExcel(formData: FormData) {
     clientName: string | null
   }[] = []
 
-  rows.forEach((row: any) => {
+  rows.forEach((row: any[]) => {
     const rowData: RowData = {}
 
     // Only include non-excluded columns

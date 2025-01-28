@@ -77,6 +77,21 @@ export default function Home() {
             </Alert>
           )}
 
+          {summaries.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-2">Summaries</h3>
+              <ul className="space-y-2">
+                {summaries.map((summary, index) => (
+                  <li key={index} className="border p-2 rounded">
+                    <p>Customer Code: {summary.customerCode}</p>
+                    <p>Total COD After Calculation: {summary.totalCODAfterCalculation.toFixed(2)}</p>
+                    <p>Whitelisted: {summary.isWhitelisted ? "Yes" : "No"}</p>
+                    <p>Client Name: {summary.clientName || "N/A"}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
