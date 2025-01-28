@@ -43,7 +43,6 @@ const EXCLUDED_COLUMNS = [
   "Monthly Excess Weight Charge",
   "Discount Charge",
   "VAT Charge",
-  "Excess Weight Charge",
 ]
 
 export async function processExcel(formData: FormData) {
