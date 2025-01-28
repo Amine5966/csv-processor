@@ -35,13 +35,6 @@ const WHITELIST_CLIENTS: WhitelistClients = {
   "2989": "TIGHT AND SLEEK"
 }
 
-interface CustomerSummary {
-  customerCode: string;
-  totalCODAfterCalculation: number;
-  isWhitelisted: boolean;
-  clientName: string | null;
-}
-
 export async function processExcel(formData: FormData) {
   const file = formData.get("file") as File
   if (!file) throw new Error("No file uploaded")
@@ -58,7 +51,7 @@ export async function processExcel(formData: FormData) {
   const data: RowData[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
 
   // Extract headers and rows
-  const headers = data[0] as string[]
+  const headers = data[0] as unknown as string[]
   const rows = data.slice(1).map(row => {
     const rowData: RowData = {}
     headers.forEach((header, index) => {
@@ -70,13 +63,13 @@ export async function processExcel(formData: FormData) {
   // Group data by Customer Code
   const groupedData: { [key: string]: RowData[] } = {}
   rows.forEach(row => {
-    const customerCode = (row["Customer Code"] || row["Customer Code"]).trim().replace(/^\ufeff/, '')
+    let customerCode = (row["Customer Code"] || row["Customer Code"]).trim().replace(/^\ufeff/, '')
     if (!groupedData[customerCode]) groupedData[customerCode] = []
     groupedData[customerCode].push(row)
   })
 
   const outputWorkbook = XLSX.utils.book_new()
-  const summaries: CustomerSummary[] = []
+  const summaries: { customerCode: string; totalCODAfterCalculation: number; isWhitelisted: boolean; clientName: string | null; }[] = []
 
   for (const [customerCode, rows] of Object.entries(groupedData)) {
     const isWhitelisted = customerCode in WHITELIST_CLIENTS
@@ -87,15 +80,15 @@ export async function processExcel(formData: FormData) {
       if (isWhitelisted) return { ...row } // No modifications for whitelisted
 
       // Calculate Total Freight
-      const freightCharge = parseFloat(row["Freight Charge"] || row["﻿Freight Charge"] || "0")
-      const excessWeightCharge = parseFloat(row["Excess Weight Charge"] || row["﻿Excess Weight Charge"] || "0")
-      const monthlyOrderCharge = parseFloat(row["Monthly Order Charge"] || row["﻿Monthly Order Charge"] || "0")
-      const monthlyExcessWeightCharge = parseFloat(row["Monthly Excess Weight Charge"] || row["﻿Monthly Excess Weight Charge"] || "0")
-      const codCharges = parseFloat(row["COD Charges"] || row["﻿COD Charges"] || "0")
-      const rtoCharge = parseFloat(row["RTO Charge"] || row["﻿RTO Charge"] || "0")
-      const insuranceCharge = parseFloat(row["Insurance Charge"] || row["﻿Insurance Charge"] || "0")
-      const discountCharge = parseFloat(row["Discount Charge"] || row["﻿Discount Charge"] || "0")
-      const vatCharge = parseFloat(row["VAT Charge"] || row["﻿VAT Charge"] || "0")
+      const freightCharge = parseFloat(row["Freight Charge"] || "0")
+      const excessWeightCharge = parseFloat(row["Excess Weight Charge"] || "0")
+      const monthlyOrderCharge = parseFloat(row["Monthly Order Charge"] || "0")
+      const monthlyExcessWeightCharge = parseFloat(row["Monthly Excess Weight Charge"] || "0")
+      const codCharges = parseFloat(row["COD Charges"] || "0")
+      const rtoCharge = parseFloat(row["RTO Charge"] || "0")
+      const insuranceCharge = parseFloat(row["Insurance Charge"] || "0")
+      const discountCharge = parseFloat(row["Discount Charge"] || "0")
+      const vatCharge = parseFloat(row["VAT Charge"] || "0")
 
       const totalFreight = freightCharge + excessWeightCharge + monthlyOrderCharge + monthlyExcessWeightCharge + codCharges + rtoCharge + insuranceCharge + discountCharge + vatCharge
 
