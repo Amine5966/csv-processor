@@ -70,7 +70,7 @@ export async function processExcel(formData: FormData) {
   // Group data by Customer Code
   const groupedData: { [key: string]: RowData[] } = {}
   rows.forEach(row => {
-    let customerCode = (row["Customer Code"] || row["﻿Customer Code"]).trim().replace(/^\ufeff/, '')
+    const customerCode = (row["Customer Code"] || row["Customer Code"]).trim().replace(/^\ufeff/, '')
     if (!groupedData[customerCode]) groupedData[customerCode] = []
     groupedData[customerCode].push(row)
   })

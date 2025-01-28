@@ -72,7 +72,7 @@ export default function Home() {
           {summaries.map(summary => (
             <Alert key={summary.customerCode} className="mt-4">
               <AlertTitle>
-                {summary.isWhitelisted ? "Whitelisted" : "Processed"} - {summary.customerCode}
+                {summary.isWhitelisted ? "Whitelisted" : "Processed"} : {summary.customerCode}
               </AlertTitle>
               <AlertDescription>
                 {summary.isWhitelisted ? (
