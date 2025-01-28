@@ -10,12 +10,14 @@ import { Loader2 } from "lucide-react"
 
 export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
-  const [summaries, setSummaries] = useState<Array<{
-    customerCode: string;
-    totalCODAfterCalculation: number;
-    isWhitelisted: boolean;
-    clientName: string | null;
-  }>>([])
+  const [summaries, setSummaries] = useState<
+    Array<{
+      customerCode: string
+      totalCODAfterCalculation: number
+      isWhitelisted: boolean
+      clientName: string | null
+    }>
+  >([])
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -27,7 +29,7 @@ export default function Home() {
     try {
       const formData = new FormData(event.currentTarget)
       const { buffer, summaries, fileName } = await processExcel(formData)
-      
+
       // Download Excel
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
       const url = URL.createObjectURL(blob)
@@ -58,7 +60,13 @@ export default function Home() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input type="file" name="file" accept=".xlsx" required />
             <Button type="submit" disabled={isProcessing}>
-              {isProcessing ? <><Loader2 className="mr-2 animate-spin" /> Processing...</> : "Process Excel"}
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 animate-spin" /> Processing...
+                </>
+              ) : (
+                "Process Excel"
+              )}
             </Button>
           </form>
 
@@ -69,22 +77,9 @@ export default function Home() {
             </Alert>
           )}
 
-          {summaries.map(summary => (
-            <Alert key={summary.customerCode} className="mt-4">
-              <AlertTitle>
-                {summary.isWhitelisted ? "Whitelisted" : "Processed"} : {summary.customerCode}
-              </AlertTitle>
-              <AlertDescription>
-                {summary.isWhitelisted ? (
-                  <p>{summary.clientName} - No calculations applied</p>
-                ) : (
-                  <p>Total COD: {summary.totalCODAfterCalculation.toFixed(2)} MAD</p>
-                )}
-              </AlertDescription>
-            </Alert>
-          ))}
         </CardContent>
       </Card>
     </div>
   )
 }
+
