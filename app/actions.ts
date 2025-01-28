@@ -45,6 +45,14 @@ const EXCLUDED_COLUMNS = [
   "VAT Charge",
 ]
 
+// Function to format number with comma as decimal separator
+function formatNumber(num: number): string {
+  if (Number.isInteger(num)) {
+    return num.toString()
+  }
+  return num.toFixed(2).replace(".", ",")
+}
+
 export async function processExcel(formData: FormData) {
   const file = formData.get("file") as File
   if (!file) throw new Error("No file uploaded")
@@ -94,6 +102,10 @@ export async function processExcel(formData: FormData) {
       .replace(/^\ufeff/, "")
     const isWhitelisted = customerCode in WHITELIST_CLIENTS
 
+    // Check if status is RTO_DELIVERED
+    const status = rowData["Status"]?.toString().toUpperCase()
+    const isRtoDelivered = status === "RTO_DELIVERED"
+
     // Calculate Total Freight (still using all original columns for calculation)
     const freightCharge = Number(row[headers.indexOf("Freight Charge")]) || 0
     const excessWeightCharge = Number(row[headers.indexOf("Excess Weight Charge")]) || 0
@@ -117,12 +129,15 @@ export async function processExcel(formData: FormData) {
       vatCharge
 
     // Calculate COD Amount After Calculation
-    const codAmount = Number(row[headers.indexOf("COD amount")]) || 0
+    const codAmount = isRtoDelivered ? 0 : Number(row[headers.indexOf("COD amount")]) || 0
     const codAfterCalculation = isWhitelisted ? codAmount : codAmount - totalFreight
 
-    // Add calculated columns
-    rowData["Total Freight"] = totalFreight.toFixed(2)
-    rowData["COD Amount After Calculation"] = codAfterCalculation.toFixed(2)
+    // Add calculated columns with formatted numbers
+    rowData["Total Freight"] = formatNumber(totalFreight)
+    rowData["COD Amount After Calculation"] = formatNumber(codAfterCalculation)
+    rowData["COD amount"] = formatNumber(codAmount)
+    rowData["Freight Charge"] = formatNumber(freightCharge)
+    rowData["Excess Weight Charge"] = formatNumber(excessWeightCharge)
 
     // Remove the duplicate "Customer Name" column if it exists
     if (rowData["Customer Name"] && rowData["Customer Name 1"]) {

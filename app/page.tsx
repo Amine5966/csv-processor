@@ -19,7 +19,7 @@ export default function Home() {
 
     try {
       const formData = new FormData(event.currentTarget)
-      const { buffer, fileName } = await processExcel(formData)
+      const { buffer, fileName} = await processExcel(formData)
 
       // Download Excel
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
@@ -67,7 +67,6 @@ export default function Home() {
             </Alert>
           )}
 
-          
         </CardContent>
       </Card>
     </div>
