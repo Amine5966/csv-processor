@@ -35,6 +35,17 @@ const WHITELIST_CLIENTS: WhitelistClients = {
   "2989": "TIGHT AND SLEEK",
 }
 
+// Columns to exclude from the output
+const EXCLUDED_COLUMNS = [
+  "Final Price",
+  "Shipper Tracking Number",
+  "Monthly Order Charge",
+  "Monthly Excess Weight Charge",
+  "Discount Charge",
+  "VAT Charge",
+  "Excess Weight Charge",
+]
+
 export async function processExcel(formData: FormData) {
   const file = formData.get("file") as File
   if (!file) throw new Error("No file uploaded")
@@ -52,8 +63,11 @@ export async function processExcel(formData: FormData) {
   const headers = data[0] as unknown as string[]
   const rows = data.slice(1)
 
-  // Add only the two calculated columns to the original headers
-  const outputHeaders = [...headers, "Total Freight", "COD Amount After Calculation"]
+  // Filter out excluded columns from headers
+  const filteredHeaders = headers.filter((header) => !EXCLUDED_COLUMNS.includes(header))
+
+  // Add the calculated columns
+  const outputHeaders = [...filteredHeaders, "Total Freight", "COD Amount After Calculation"]
   const processedRows: RowData[] = []
   const summaries: {
     customerCode: string
@@ -64,9 +78,10 @@ export async function processExcel(formData: FormData) {
 
   rows.forEach((row: any) => {
     const rowData: RowData = {}
+
+    // Only include non-excluded columns
     headers.forEach((header, index) => {
-      if (header) {
-        // Only include columns with headers
+      if (header && !EXCLUDED_COLUMNS.includes(header)) {
         rowData[header] = row[index]?.toString() || ""
       }
     })
@@ -77,16 +92,16 @@ export async function processExcel(formData: FormData) {
       .replace(/^\ufeff/, "")
     const isWhitelisted = customerCode in WHITELIST_CLIENTS
 
-    // Calculate Total Freight
-    const freightCharge = Number(rowData["Freight Charge"]) || 0
-    const excessWeightCharge = Number(rowData["Excess Weight Charge"]) || 0
-    const monthlyOrderCharge = Number(rowData["Monthly Order Charge"]) || 0
-    const monthlyExcessWeightCharge = Number(rowData["Monthly Excess Weight Charge"]) || 0
-    const codCharges = Number(rowData["COD Charges"]) || 0
-    const rtoCharge = Number(rowData["RTO Charge"]) || 0
-    const insuranceCharge = Number(rowData["Insurance Charge"]) || 0
-    const discountCharge = Number(rowData["Discount Charge"]) || 0
-    const vatCharge = Number(rowData["VAT Charge"]) || 0
+    // Calculate Total Freight (still using all original columns for calculation)
+    const freightCharge = Number(row[headers.indexOf("Freight Charge")]) || 0
+    const excessWeightCharge = Number(row[headers.indexOf("Excess Weight Charge")]) || 0
+    const monthlyOrderCharge = Number(row[headers.indexOf("Monthly Order Charge")]) || 0
+    const monthlyExcessWeightCharge = Number(row[headers.indexOf("Monthly Excess Weight Charge")]) || 0
+    const codCharges = Number(row[headers.indexOf("COD Charges")]) || 0
+    const rtoCharge = Number(row[headers.indexOf("RTO Charge")]) || 0
+    const insuranceCharge = Number(row[headers.indexOf("Insurance Charge")]) || 0
+    const discountCharge = Number(row[headers.indexOf("Discount Charge")]) || 0
+    const vatCharge = Number(row[headers.indexOf("VAT Charge")]) || 0
 
     const totalFreight =
       freightCharge +
@@ -100,7 +115,7 @@ export async function processExcel(formData: FormData) {
       vatCharge
 
     // Calculate COD Amount After Calculation
-    const codAmount = Number(rowData["COD amount"]) || 0
+    const codAmount = Number(row[headers.indexOf("COD amount")]) || 0
     const codAfterCalculation = isWhitelisted ? codAmount : codAmount - totalFreight
 
     // Add calculated columns
