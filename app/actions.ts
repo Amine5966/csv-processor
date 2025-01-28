@@ -125,6 +125,11 @@ export async function processExcel(formData: FormData) {
     rowData["Total Freight"] = totalFreight.toFixed(2)
     rowData["COD Amount After Calculation"] = codAfterCalculation.toFixed(2)
 
+    // Remove the duplicate "Customer Name" column if it exists
+    if (rowData["Customer Name"] && rowData["Customer Name 1"]) {
+      delete rowData["Customer Name 1"]
+    }
+
     // Update summaries
     const existingSummary = summaries.find((s) => s.customerCode === customerCode)
     if (existingSummary) {
@@ -141,8 +146,13 @@ export async function processExcel(formData: FormData) {
     processedRows.push(rowData)
   })
 
+  // Remove the duplicate "Customer Name" column from the output headers if it exists
+  const uniqueOutputHeaders = outputHeaders.filter((header, index, self) =>
+    header === "Customer Name" ? self.indexOf(header) === index : true,
+  )
+
   const outputWorkbook = XLSX.utils.book_new()
-  const outputWorksheet = XLSX.utils.json_to_sheet(processedRows, { header: outputHeaders })
+  const outputWorksheet = XLSX.utils.json_to_sheet(processedRows, { header: uniqueOutputHeaders })
   XLSX.utils.book_append_sheet(outputWorkbook, outputWorksheet, "Processed Data")
 
   const excelBuffer = XLSX.write(outputWorkbook, { bookType: "xlsx", type: "array" })
