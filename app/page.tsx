@@ -47,7 +47,7 @@ export default function Home() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (error) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+      setError(error instanceof Error ? error.message : "An error occurred .. ")
     } finally {
       setIsProcessing(false)
     }
