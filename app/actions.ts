@@ -47,7 +47,6 @@ const EXCLUDED_COLUMNS = [
   "Excess Weight Charge",
 ]
 
-// Function to format number with comma as decimal separator
 function formatNumber(num: number): string {
   if (Number.isInteger(num)) {
     return num.toString()
@@ -122,12 +121,18 @@ function parseCSV(csvText: string) {
   return { headers, data: result }
 }
 
-async function fetchAndProcessData(fromDate: Date, toDate: Date) {
+async function fetchAndProcessData(fromDate: string, toDate: string) {
   console.debug("Starting data fetch and processing...")
   const accessToken = await login()
   console.debug("Access token received.")
-  const fsdate = format(fromDate, "yyyy-MM-dd")
-  const fldate = format(toDate, "yyyy-MM-dd")
+  
+  // Parse the ISO strings to Date objects
+  const fromDateObj = new Date(fromDate)
+  const toDateObj = new Date(toDate)
+  
+  // Format the dates for the API call
+  const fsdate = format(fromDateObj, "yyyy-MM-dd")
+  const fldate = format(toDateObj, "yyyy-MM-dd")
   console.debug(`Formatted From Date: ${fsdate}`)
   console.debug(`Formatted To Date: ${fldate}`)
 
@@ -136,23 +141,20 @@ async function fetchAndProcessData(fromDate: Date, toDate: Date) {
 
   let allData: RowData[] = []
 
-  // Create an array of promises for fetching files
   const fetchPromises = invoiceData.map(async (item: any) => {
     console.debug(`Fetching file from link: ${item.fileLink}`)
     try {
       const response = await axios.get(item.fileLink)
       const { data } = parseCSV(response.data)
-      return data // Return the parsed data
+      return data
     } catch (error) {
       console.error(`Error fetching file from ${item.fileLink}:`, error)
-      return [] // Return an empty array on error
+      return []
     }
   })
 
-  // Wait for all fetch promises to resolve
   const results = await Promise.all(fetchPromises)
   
-  // Flatten the results into allData
   allData = results.flat()
 
   console.debug("Data fetching and processing completed.")
@@ -207,7 +209,6 @@ function processData(data: RowData[]) {
     processedRow["COD Amount After Calculation"] = formatNumber(codAfterCalculation)
     processedRow["Status"] = row["Status"] || ""
 
-    // Format other numeric fields
     processedRow["Freight Charge"] = formatNumber(freightCharge)
     processedRow["Excess Weight Charge"] = formatNumber(excessWeightCharge)
     processedRow["Monthly Order Charge"] = formatNumber(monthlyOrderCharge)
@@ -219,12 +220,10 @@ function processData(data: RowData[]) {
     processedRow["VAT Charge"] = formatNumber(vatCharge)
     processedRow["COD amount"] = formatNumber(codAmount)
 
-    // Remove excluded columns
     EXCLUDED_COLUMNS.forEach((column) => {
       delete processedRow[column]
     })
 
-    // Handle duplicate Customer Name
     if (processedRow["Customer Name 1"]) {
       delete processedRow["Customer Name 1"]
     }
@@ -251,7 +250,6 @@ function processData(data: RowData[]) {
 export async function processExcel(formData: FormData) {
   console.debug("Processing Excel file...")
   
-  // Log the entire formData for debugging
   for (const [key, value] of formData.entries()) {
     console.debug(`FormData - ${key}: ${value}`)
   }
@@ -266,7 +264,6 @@ export async function processExcel(formData: FormData) {
 
   let processedData, summaries
 
-  // Check if the file is actually present and not just a falsy value
   if (file && file instanceof File && file.size > 0) {
     console.debug("File detected, processing file...")
     const arrayBuffer = await file.arrayBuffer()
@@ -279,7 +276,7 @@ export async function processExcel(formData: FormData) {
     summaries = result.summaries
   } else if (fromDate && toDate) {
     console.debug("Date range detected, fetching data...")
-    const result = await fetchAndProcessData(new Date(fromDate), new Date(toDate))
+    const result = await fetchAndProcessData(fromDate, toDate)
     processedData = result.processedRows
     summaries = result.summaries
   } else {
@@ -287,7 +284,6 @@ export async function processExcel(formData: FormData) {
     throw new Error("Invalid input: Either file or date range is required")
   }
 
-  // Create a new workbook with the processed data
   const outputWorkbook = XLSX.utils.book_new()
   const outputWorksheet = XLSX.utils.json_to_sheet(processedData)
   XLSX.utils.book_append_sheet(outputWorkbook, outputWorksheet, "Processed Data")
@@ -297,4 +293,3 @@ export async function processExcel(formData: FormData) {
   console.debug("Excel file processed successfully.")
   return { buffer: excelBuffer, summaries, fileName: `generated_invoices_${today}.xlsx` }
 }
-

@@ -27,12 +27,16 @@ export default function Home() {
     try {
       const formData = new FormData(event.currentTarget)
       if (fromDate && toDate) {
-        formData.append("fromDate", fromDate.toISOString())
-        formData.append("toDate", toDate.toISOString())
+        const adjustedFromDate = new Date(Date.UTC(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate()))
+        const adjustedToDate = new Date(
+          Date.UTC(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999),
+        )
+
+        formData.append("fromDate", adjustedFromDate.toISOString())
+        formData.append("toDate", adjustedToDate.toISOString())
       }
       const { buffer, fileName } = await processExcel(formData)
 
-      // Download Excel
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
