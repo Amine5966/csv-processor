@@ -106,7 +106,7 @@ export default function Home() {
             <Button type="submit" disabled={isProcessing}>
               {isProcessing ? (
                 <>
-                  <Loader2 className="mr-2 animate-spin" /> Processing...
+                  <Loader2 className="mr-2 animate-spin" /> Processing......
                 </>
               ) : (
                 "Process Data"

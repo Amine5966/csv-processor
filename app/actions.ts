@@ -56,7 +56,7 @@ function formatNumber(num: number): string {
 }
 
 async function login() {
-  console.debug("Attempting to log in...")
+  console.debug("Attempting to log in.....")
   const response = await axios.post(
     "https://projectxuaeapi.shipsy.io/api/dashboard/login",
     {
