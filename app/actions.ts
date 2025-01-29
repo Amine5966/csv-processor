@@ -45,13 +45,15 @@ const EXCLUDED_COLUMNS = [
   "Discount Charge",
   "VAT Charge",
   "Excess Weight Charge",
+  "Invoice Number",
+  "Invoice Date"
 ]
 
-function formatNumber(num: number): string {
+function formatNumber(num: number): number | string {
   if (Number.isInteger(num)) {
-    return num.toString()
+    return num
   }
-  return num.toFixed(2).replace(".", ",")
+  return Number(num.toFixed(2))
 }
 
 async function login() {
