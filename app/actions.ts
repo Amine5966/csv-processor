@@ -44,7 +44,6 @@ const EXCLUDED_COLUMNS = [
   "Monthly Excess Weight Charge",
   "Discount Charge",
   "VAT Charge",
-  "Excess Weight Charge",
   "Invoice Number",
   "Invoice Date"
 ]
