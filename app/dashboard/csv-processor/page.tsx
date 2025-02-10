@@ -12,7 +12,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { CalendarIcon } from "lucide-react"
-import Image from 'next/image'
 
 export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
@@ -55,7 +54,7 @@ export default function Home() {
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto max-w-7xl px-4 py-10">
 
       <Card>
         <CardHeader>
