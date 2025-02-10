@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque } from "next/font/google"
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const bricolage_Grotesque = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -22,7 +23,9 @@ export default function RootLayout({
       <body
          className={bricolage_Grotesque.className}
       >
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

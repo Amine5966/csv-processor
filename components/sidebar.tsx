@@ -3,10 +3,11 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { X, LogOut, User } from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
 
 const sidebarNavItems = [
   {
@@ -26,14 +27,7 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
-
-  const handleLogout = () => {
-    // Implement logout logic here
-    // For example:
-    // logout().then(() => router.push('/'))
-    router.push("/")
-  }
+  const { logout } = useAuth()
 
   return (
     <div
@@ -84,7 +78,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
             <span className="font-medium">chronodiali-finance</span>
           </div>
         </div>
-        <Button variant="outline" className="w-full" onClick={handleLogout}>
+        <Button variant="outline" className="w-full" onClick={logout}>
           <LogOut className="mr-2 h-4 w-4" /> Logout
         </Button>
       </div>
