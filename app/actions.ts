@@ -188,18 +188,20 @@ function processData(data: RowData[]) {
     const status = row["Status"]?.toString().toLowerCase() || ""
     let codCharges = Number(row["COD Charges"]) || 0
 
-    // Special condition for customer code 704
-    if (customerCode === "704" && status === "delivered") {
-      console.debug("Applying special condition for customer code 704.")
+    const codAmount = status === "rto_delivered" ? 0 : Number(row["COD amount"]) || 0
+
+    if (customerCode === "704" && status === "delivered" && codAmount !== 0) {
+      console.debug("Special case for LC WAIKIKI detected.")
       const innerOuter = (row["Inner/ Outer"] || "").toString().toLowerCase().trim()
-      console.debug(`Inner/Outer value: ${innerOuter}`)
+      console.debug(`Inner/ Outer value: ${innerOuter}`)
       if (innerOuter === "inner") {
-        console.debug("Setting COD Charges to 5 for inner.")
+        console.debug("Applying inner cod charges for LC WAIKIKI.")
         codCharges = 5
       } else if (innerOuter === "outer") {
-        console.debug("Setting COD Charges to 4.75 for outer.")
+        console.debug("Applying outer cod charges for LC WAIKIKI.") 
         codCharges = 4.75
       }
+      console.debug(`codCharges set to: ${codCharges}`)
     }
 
     console.debug(`codCharges after condition: ${codCharges}`)
@@ -221,8 +223,6 @@ function processData(data: RowData[]) {
       discountCharge +
       vatCharge
 
-    
-    const codAmount = status === "rto_delivered" ? 0 : Number(row["COD amount"]) || 0
     const codAfterCalculation = isWhitelisted ? codAmount : codAmount - totalFreight
 
     processedRow["Total Freight"] = formatNumber(totalFreight)
