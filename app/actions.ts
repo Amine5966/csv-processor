@@ -185,7 +185,27 @@ function processData(data: RowData[]) {
     const excessWeightCharge = Number(row["Excess Weight Charge"]) || 0
     const monthlyOrderCharge = Number(row["Monthly Order Charge"]) || 0
     const monthlyExcessWeightCharge = Number(row["Monthly Excess Weight Charge"]) || 0
-    const codCharges = Number(row["COD Charges"]) || 0
+    const status = row["Status"]?.toString().toLowerCase() || ""
+    let codCharges = Number(row["COD Charges"]) || 0
+
+    // Special condition for customer code 704
+    if (customerCode === "704" && status === "delivered") {
+      console.debug("Applying special condition for customer code 704.")
+      const innerOuter = (row["Inner/ Outer"] || "").toString().toLowerCase().trim()
+      console.debug(`Inner/Outer value: ${innerOuter}`)
+      if (innerOuter === "inner") {
+        console.debug("Setting COD Charges to 5 for inner.")
+        codCharges = 5
+        console
+      } else if (innerOuter === "outer") {
+        console.debug("Setting COD Charges to 4.75 for outer.")
+        codCharges = 4.75
+      }
+    }
+
+    console.debug(`codCharges after condition: ${codCharges}`)
+
+
     const rtoCharge = Number(row["RTO Charge"]) || 0
     const insuranceCharge = Number(row["Insurance Charge"]) || 0
     const discountCharge = Number(row["Discount Charge"]) || 0
@@ -202,7 +222,7 @@ function processData(data: RowData[]) {
       discountCharge +
       vatCharge
 
-    const status = row["Status"]?.toString().toLowerCase() || ""
+    
     const codAmount = status === "rto_delivered" ? 0 : Number(row["COD amount"]) || 0
     const codAfterCalculation = isWhitelisted ? codAmount : codAmount - totalFreight
 
