@@ -196,7 +196,6 @@ function processData(data: RowData[]) {
       if (innerOuter === "inner") {
         console.debug("Setting COD Charges to 5 for inner.")
         codCharges = 5
-        console
       } else if (innerOuter === "outer") {
         console.debug("Setting COD Charges to 4.75 for outer.")
         codCharges = 4.75
