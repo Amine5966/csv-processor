@@ -444,16 +444,6 @@ async function processData(data: RowData[], onProgress?: ProgressCallback) {
 export async function processExcel(formData: FormData) {
   console.debug("Traitement du fichier Excel...")
   
-  // Create a simple progress tracking mechanism
-  let currentProgress = 0
-  let currentMessage = "Démarrage..."
-  
-  const updateProgress = (progress: number, message: string) => {
-    currentProgress = progress
-    currentMessage = message
-    console.debug(`Progression: ${progress}% - ${message}`)
-  }
-  
   for (const [key, value] of formData.entries()) {
     console.debug(`FormData - ${key}: ${value}`)
   }
@@ -470,7 +460,6 @@ export async function processExcel(formData: FormData) {
 
   if (file && file instanceof File && file.size > 0) {
     console.debug("Fichier détecté, traitement du fichier...")
-    updateProgress(10, "Lecture du fichier Excel...")
     
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: "buffer" })
@@ -478,14 +467,12 @@ export async function processExcel(formData: FormData) {
     const worksheet = workbook.Sheets[sheetName]
     const rawData = XLSX.utils.sheet_to_json(worksheet) as RowData[]
     
-    updateProgress(30, `Traitement de ${rawData.length} enregistrements du fichier...`)
-    const result = await processData(rawData, updateProgress)
+    const result = await processData(rawData)
     processedData = result.processedRows
     summaries = result.summaries
   } else if (fromDate && toDate) {
     console.debug("Plage de dates détectée, récupération des données...")
-    updateProgress(5, "Récupération des données depuis l'API...")
-    const result = await fetchAndProcessData(fromDate, toDate, updateProgress)
+    const result = await fetchAndProcessData(fromDate, toDate)
     processedData = result.processedRows
     summaries = result.summaries
   } else {
@@ -493,7 +480,6 @@ export async function processExcel(formData: FormData) {
     throw new Error("Entrée invalide: Un fichier ou une plage de dates est requis")
   }
 
-  updateProgress(95, "Génération du fichier Excel...")
   const outputWorkbook = XLSX.utils.book_new()
   const outputWorksheet = XLSX.utils.json_to_sheet(processedData)
   XLSX.utils.book_append_sheet(outputWorkbook, outputWorksheet, "Données Traitées")
@@ -501,7 +487,6 @@ export async function processExcel(formData: FormData) {
   const excelBuffer = XLSX.write(outputWorkbook, { bookType: "xlsx", type: "array" })
   const today = new Date().toISOString().split("T")[0]
   
-  updateProgress(100, "Génération du rapport terminée!")
   console.debug("Fichier Excel traité avec succès.")
   return { buffer: excelBuffer, summaries, fileName: `factures_generees_${today}.xlsx` }
 }
