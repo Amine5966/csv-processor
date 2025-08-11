@@ -6,7 +6,7 @@ import { format } from "date-fns"
 
 // Add delay function for rate limiting
 function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 interface RowData {
@@ -17,9 +17,7 @@ type WhitelistClients = {
   [key: string]: string
 }
 
-interface ProgressCallback {
-  (progress: number, message: string): void
-}
+type ProgressCallback = (progress: number, message: string) => void
 
 const WHITELIST_CLIENTS: WhitelistClients = {
   "520": "FACES",
@@ -62,13 +60,13 @@ const excessWeightData = [
 ]
 
 const surchargeData = [
-  { shipperName: "OFFRE MYMARKET", surcharge: 3.00, customerCode: 2480 },
-  { shipperName: "Wildaty", surcharge: 3.00, customerCode: 1534 },
-  { shipperName: "MYSHEMSI", surcharge: 4.00, customerCode: 2368 },
-  { shipperName: "SONAJUTE.MA", surcharge: 4.00, customerCode: 2477 },
-  { shipperName: "EQUICK", surcharge: 1.00, customerCode: 2738 },
-  { shipperName: "EQUICK", surcharge: 1.00, customerCode: 965 },
-  { shipperName: "MARIJANE MALL", surcharge: 2.80, customerCode: 1244 },
+  { shipperName: "OFFRE MYMARKET", surcharge: 3.0, customerCode: 2480 },
+  { shipperName: "Wildaty", surcharge: 3.0, customerCode: 1534 },
+  { shipperName: "MYSHEMSI", surcharge: 4.0, customerCode: 2368 },
+  { shipperName: "SONAJUTE.MA", surcharge: 4.0, customerCode: 2477 },
+  { shipperName: "EQUICK", surcharge: 1.0, customerCode: 2738 },
+  { shipperName: "EQUICK", surcharge: 1.0, customerCode: 965 },
+  { shipperName: "MARIJANE MALL", surcharge: 2.8, customerCode: 1244 },
 ]
 
 // Default values for shippers not in excessWeightData
@@ -83,7 +81,7 @@ const EXCLUDED_COLUMNS = [
   "Discount Charge",
   "VAT Charge",
   "Invoice Number",
-  "Invoice Date"
+  "Invoice Date",
 ]
 
 function formatNumber(num: number): number | string {
@@ -107,47 +105,76 @@ async function login() {
   return response.data.data.access_token.id
 }
 
-async function fetchConsignmentDetails(accessToken: string, referenceNumber: string, retryCount = 0) {
-  console.debug(`Récupération des détails de l'envoi pour le numéro de référence: ${referenceNumber} (tentative ${retryCount + 1})`)
-  
-  // Add delay between requests to respect rate limits
-  if (retryCount > 0) {
-    const delayMs = Math.min(1000 * Math.pow(2, retryCount), 10000) // Exponential backoff, max 10 seconds
-    console.debug(`Attente de ${delayMs}ms avant nouvelle tentative...`)
-    await delay(delayMs)
-  } else {
-    // Always add a small delay between requests
-    await delay(500) // 500ms delay between requests
+// Optimized batch API call function
+async function fetchConsignmentDetailsBatch(
+  accessToken: string,
+  referenceNumbers: string[],
+  onProgress?: ProgressCallback,
+) {
+  console.debug(`Traitement par lots de ${referenceNumbers.length} références client 565...`)
+
+  const results = new Map<string, any>()
+  const BATCH_SIZE = 5 // Process 5 requests in parallel
+  const DELAY_BETWEEN_BATCHES = 200 // 200ms delay between batches
+
+  // Split into batches
+  const batches = []
+  for (let i = 0; i < referenceNumbers.length; i += BATCH_SIZE) {
+    batches.push(referenceNumbers.slice(i, i + BATCH_SIZE))
   }
-  
-  try {
-    const response = await axios.get(
-      `https://projectxuaeapi.shipsy.io/api/CRMDashboard/consignments/fetchOne?referenceNumber=${referenceNumber}&send_unmasked_data=false`,
-      {
-        headers: {
-          "accept": "application/json, text/plain, */*",
-          "access-token": accessToken,
-          "organisation-id": "chronodiali",
-          "user-id": "2102825743602945225",
-        },
-        timeout: 10000, // 10 second timeout
+
+  console.debug(`Divisé en ${batches.length} lots de ${BATCH_SIZE} requêtes maximum`)
+
+  for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+    const batch = batches[batchIndex]
+
+    // Update progress
+    const progressPercent = (batchIndex / batches.length) * 100
+    onProgress?.(50 + progressPercent * 0.3, `Traitement du lot ${batchIndex + 1}/${batches.length} pour client 565...`)
+
+    // Process batch in parallel
+    const batchPromises = batch.map(async (referenceNumber) => {
+      try {
+        await delay(50) // Small delay to avoid overwhelming the API
+        const response = await axios.get(
+          `https://projectxuaeapi.shipsy.io/api/CRMDashboard/consignments/fetchOne?referenceNumber=${referenceNumber}&send_unmasked_data=false`,
+          {
+            headers: {
+              accept: "application/json, text/plain, */*",
+              "access-token": accessToken,
+              "organisation-id": "chronodiali",
+              "user-id": "2102825743602945225",
+            },
+            timeout: 8000, // Reduced timeout to 8 seconds
+          },
+        )
+        return { referenceNumber, data: response.data[0] }
+      } catch (error: any) {
+        console.error(`Erreur pour la référence ${referenceNumber}:`, error.message)
+        return { referenceNumber, data: null }
       }
-    )
-    console.debug(`Détails de l'envoi récupérés pour ${referenceNumber}`)
-    return response.data[0] // API returns an array, we need the first item
-  } catch (error: any) {
-    console.error(`Erreur lors de la récupération des détails de l'envoi pour ${referenceNumber} (tentative ${retryCount + 1}):`, error.message)
-    
-    // Retry logic for rate limiting and network errors
-    if (error.response?.status === 429 || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
-      if (retryCount < 3) { // Max 3 retries
-        console.debug(`Nouvelle tentative pour ${referenceNumber} dans ${Math.min(1000 * Math.pow(2, retryCount + 1), 10000)}ms...`)
-        return await fetchConsignmentDetails(accessToken, referenceNumber, retryCount + 1)
+    })
+
+    // Wait for batch to complete
+    const batchResults = await Promise.all(batchPromises)
+
+    // Store results
+    batchResults.forEach(({ referenceNumber, data }) => {
+      if (data) {
+        results.set(referenceNumber, data)
       }
+    })
+
+    console.debug(`Lot ${batchIndex + 1} terminé: ${batchResults.filter((r) => r.data).length}/${batch.length} succès`)
+
+    // Delay between batches (except for the last one)
+    if (batchIndex < batches.length - 1) {
+      await delay(DELAY_BETWEEN_BATCHES)
     }
-    
-    return null
   }
+
+  console.debug(`Traitement par lots terminé: ${results.size}/${referenceNumbers.length} références récupérées`)
+  return results
 }
 
 async function fetchInvoiceData(accessToken: string, fromDate: string, toDate: string) {
@@ -206,15 +233,15 @@ function parseCSV(csvText: string) {
 async function fetchAndProcessData(fromDate: string, toDate: string, onProgress?: ProgressCallback) {
   console.debug("Début de la récupération et du traitement des données...")
   onProgress?.(5, "Connexion en cours...")
-  
+
   const accessToken = await login()
   console.debug("Jeton d'accès reçu.")
   onProgress?.(10, "Récupération des données de facture...")
-  
+
   // Parse the ISO strings to Date objects
   const fromDateObj = new Date(fromDate)
   const toDateObj = new Date(toDate)
-  
+
   // Format the dates for the API call
   const fsdate = format(fromDateObj, "yyyy-MM-dd")
   const fldate = format(toDateObj, "yyyy-MM-dd")
@@ -232,7 +259,10 @@ async function fetchAndProcessData(fromDate: string, toDate: string, onProgress?
     try {
       const response = await axios.get(item.fileLink)
       const { data } = parseCSV(response.data)
-      onProgress?.(20 + (index + 1) / invoiceData.length * 30, `Traitement du fichier ${index + 1} sur ${invoiceData.length}...`)
+      onProgress?.(
+        20 + ((index + 1) / invoiceData.length) * 25,
+        `Traitement du fichier ${index + 1} sur ${invoiceData.length}...`,
+      )
       return data
     } catch (error) {
       console.error(`Erreur lors de la récupération du fichier depuis ${item.fileLink}:`, error)
@@ -241,15 +271,15 @@ async function fetchAndProcessData(fromDate: string, toDate: string, onProgress?
   })
 
   const results = await Promise.all(fetchPromises)
-  
+
   allData = results.flat()
-  onProgress?.(50, `Traitement de ${allData.length} enregistrements...`)
+  onProgress?.(45, `Traitement de ${allData.length} enregistrements...`)
 
   console.debug("Récupération et traitement des données terminés.")
-  return processData(allData, onProgress)
+  return processData(allData, onProgress, accessToken)
 }
 
-async function processData(data: RowData[], onProgress?: ProgressCallback) {
+async function processData(data: RowData[], onProgress?: ProgressCallback, accessToken?: string) {
   console.debug("Traitement des données...")
   const processedRows: RowData[] = []
   const summaries: {
@@ -259,21 +289,35 @@ async function processData(data: RowData[], onProgress?: ProgressCallback) {
     clientName: string | null
   }[] = []
 
-  // Get access token for API calls
-  const accessToken = await login()
-  
-  // Cache for API responses to avoid duplicate calls
-  const consignmentCache = new Map<string, any>()
-  
-  // Count customer 565 rows for progress tracking
-  const customer565Rows = data.filter(row => {
-    const customerCode = (row["Customer Code"] || "").toString().trim().replace(/^\ufeff/, "")
-    return customerCode === "565" && row["Reference Number"]?.toString()
-  })
-  
-  let customer565Processed = 0
-  const totalCustomer565 = customer565Rows.length
+  // Get access token if not provided
+  if (!accessToken) {
+    accessToken = await login()
+  }
 
+  // Pre-fetch all customer 565 consignment details in batches
+  const customer565References = data
+    .filter((row) => {
+      const customerCode = (row["Customer Code"] || "")
+        .toString()
+        .trim()
+        .replace(/^\ufeff/, "")
+      return customerCode === "565" && row["Reference Number"]?.toString()
+    })
+    .map((row) => row["Reference Number"]?.toString())
+    .filter((ref): ref is string => !!ref)
+
+  // Remove duplicates
+  const uniqueReferences = [...new Set(customer565References)]
+  console.debug(`Trouvé ${uniqueReferences.length} références uniques pour le client 565`)
+
+  // Batch fetch all consignment details
+  let consignmentCache = new Map<string, any>()
+  if (uniqueReferences.length > 0) {
+    onProgress?.(50, `Récupération des détails pour ${uniqueReferences.length} références client 565...`)
+    consignmentCache = await fetchConsignmentDetailsBatch(accessToken, uniqueReferences, onProgress)
+  }
+
+  // Process all rows
   for (let i = 0; i < data.length; i++) {
     const row = data[i]
     const processedRow: RowData = { ...row }
@@ -296,42 +340,36 @@ async function processData(data: RowData[], onProgress?: ProgressCallback) {
     const chargeableWeight = Number(row["Chargeable Weight"]) || 0
 
     // Enhanced excess weight calculation logic
-    const customerCodeNum = parseInt(customerCode)
-    const excessWeightConfig = excessWeightData.find(config => config.customerCode === customerCodeNum)
-    
+    const customerCodeNum = Number.parseInt(customerCode)
+    const excessWeightConfig = excessWeightData.find((config) => config.customerCode === customerCodeNum)
+
     if (excessWeightConfig) {
       // Special shipper - use custom threshold and surcharge
-      const surchargeConfig = surchargeData.find(config => config.customerCode === customerCodeNum)
-      
+      const surchargeConfig = surchargeData.find((config) => config.customerCode === customerCodeNum)
+
       if (surchargeConfig) {
         if (chargeableWeight <= excessWeightConfig.excessWeight) {
           excessWeightCharge = 0
-          console.debug(`Client spécial ${customerCode}: Poids facturable (${chargeableWeight}) <= seuil (${excessWeightConfig.excessWeight}), frais de surpoids = 0`)
         } else {
           const excessWeight = chargeableWeight - excessWeightConfig.excessWeight
           excessWeightCharge = excessWeight * surchargeConfig.surcharge
-          console.debug(`Client spécial ${customerCode}: Poids excédentaire = ${excessWeight}, Frais = ${excessWeight} × ${surchargeConfig.surcharge} = ${excessWeightCharge}`)
         }
       } else {
-        console.debug(`Configuration de surcharge non trouvée pour le client spécial ${customerCode}`)
         // Fallback to default if no surcharge config found
         if (chargeableWeight <= excessWeightConfig.excessWeight) {
           excessWeightCharge = 0
         } else {
           const excessWeight = chargeableWeight - excessWeightConfig.excessWeight
           excessWeightCharge = excessWeight * DEFAULT_EXCESS_WEIGHT_CHARGE
-          console.debug(`Client spécial ${customerCode} (surcharge par défaut): Poids excédentaire = ${excessWeight}, Frais = ${excessWeight} × ${DEFAULT_EXCESS_WEIGHT_CHARGE} = ${excessWeightCharge}`)
         }
       }
     } else {
       // Default shipper - use default threshold (15kg) and charge (5 DH/kg)
       if (chargeableWeight <= DEFAULT_EXCESS_WEIGHT_THRESHOLD) {
         excessWeightCharge = 0
-        console.debug(`Client par défaut ${customerCode}: Poids facturable (${chargeableWeight}) <= seuil par défaut (${DEFAULT_EXCESS_WEIGHT_THRESHOLD}), frais de surpoids = 0`)
       } else {
         const excessWeight = chargeableWeight - DEFAULT_EXCESS_WEIGHT_THRESHOLD
         excessWeightCharge = excessWeight * DEFAULT_EXCESS_WEIGHT_CHARGE
-        console.debug(`Client par défaut ${customerCode}: Poids excédentaire = ${excessWeight}, Frais = ${excessWeight} × ${DEFAULT_EXCESS_WEIGHT_CHARGE} = ${excessWeightCharge}`)
       }
     }
 
@@ -345,38 +383,18 @@ async function processData(data: RowData[], onProgress?: ProgressCallback) {
       }
     }
 
-    // Special condition for customer code 565
+    // Special condition for customer code 565 - use pre-fetched data
     if (customerCode === "565" && referenceNumber) {
-      try {
-        let consignmentDetails = consignmentCache.get(referenceNumber)
-        
-        if (!consignmentDetails) {
-          consignmentDetails = await fetchConsignmentDetails(accessToken, referenceNumber)
-          if (consignmentDetails) {
-            consignmentCache.set(referenceNumber, consignmentDetails)
-          }
-          customer565Processed++
-          
-          // Update progress for customer 565 API calls
-          const apiProgress = totalCustomer565 > 0 ? (customer565Processed / totalCustomer565) * 30 : 0
-          const overallProgress = 50 + apiProgress + (i / data.length) * 20
-          onProgress?.(Math.min(overallProgress, 90), 
-            `Traitement des appels API pour le client 565: ${customer565Processed}/${totalCustomer565} (Ligne ${i + 1}/${data.length})`)
-        }
-        
-        if (consignmentDetails && consignmentDetails.destination_hub_code === "EXT01") {
-          freightCharge = 48.16
-          console.debug(`Frais de transport mis à jour à 48.16 pour la référence ${referenceNumber} avec hub de destination EXT01`)
-        }
-      } catch (error) {
-        console.error(`Erreur lors du traitement de la condition client 565 pour ${referenceNumber}:`, error)
+      const consignmentDetails = consignmentCache.get(referenceNumber)
+      if (consignmentDetails && consignmentDetails.destination_hub_code === "EXT01") {
+        freightCharge = 48.16
       }
-    } else {
-      // Update progress for non-565 rows
-      const overallProgress = 50 + (totalCustomer565 > 0 ? 30 : 0) + (i / data.length) * 20
-      if (i % 100 === 0) { // Update every 100 rows to avoid too many updates
-        onProgress?.(Math.min(overallProgress, 90), `Traitement de la ligne ${i + 1} sur ${data.length}...`)
-      }
+    }
+
+    // Update progress every 500 rows
+    if (i % 500 === 0) {
+      const progressPercent = (i / data.length) * 100
+      onProgress?.(80 + progressPercent * 0.1, `Traitement de la ligne ${i + 1} sur ${data.length}...`)
     }
 
     // Rest of the processing logic remains the same...
@@ -443,7 +461,7 @@ async function processData(data: RowData[], onProgress?: ProgressCallback) {
 
 export async function processExcel(formData: FormData) {
   console.debug("Traitement du fichier Excel...")
-  
+
   for (const [key, value] of formData.entries()) {
     console.debug(`FormData - ${key}: ${value}`)
   }
@@ -452,7 +470,7 @@ export async function processExcel(formData: FormData) {
   const fromDate = formData.get("fromDate") as string | null
   const toDate = formData.get("toDate") as string | null
 
-  console.debug(`Fichier: ${file ? 'Détecté' : 'Non détecté'}`)
+  console.debug(`Fichier: ${file ? "Détecté" : "Non détecté"}`)
   console.debug(`Date de début: ${fromDate}`)
   console.debug(`Date de fin: ${toDate}`)
 
@@ -460,13 +478,13 @@ export async function processExcel(formData: FormData) {
 
   if (file && file instanceof File && file.size > 0) {
     console.debug("Fichier détecté, traitement du fichier...")
-    
+
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: "buffer" })
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
     const rawData = XLSX.utils.sheet_to_json(worksheet) as RowData[]
-    
+
     const result = await processData(rawData)
     processedData = result.processedRows
     summaries = result.summaries
@@ -486,7 +504,7 @@ export async function processExcel(formData: FormData) {
 
   const excelBuffer = XLSX.write(outputWorkbook, { bookType: "xlsx", type: "array" })
   const today = new Date().toISOString().split("T")[0]
-  
+
   console.debug("Fichier Excel traité avec succès.")
   return { buffer: excelBuffer, summaries, fileName: `factures_generees_${today}.xlsx` }
 }
