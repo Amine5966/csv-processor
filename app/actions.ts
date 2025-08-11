@@ -279,7 +279,7 @@ async function fetchAndProcessData(fromDate: string, toDate: string, onProgress?
   return processData(allData, onProgress, accessToken)
 }
 
-async function processData(data: RowData[], onProgress?: ProgressCallback, accessToken?: string) {
+async function processData(data: RowData[], onProgress?: ProgressCallback, initialAccessToken?: string) {
   console.debug("Traitement des données...")
   const processedRows: RowData[] = []
   const summaries: {
@@ -289,8 +289,11 @@ async function processData(data: RowData[], onProgress?: ProgressCallback, acces
     clientName: string | null
   }[] = []
 
-  // Get access token if not provided
-  if (!accessToken) {
+  // Ensure accessToken is always a string
+  let accessToken: string
+  if (initialAccessToken) {
+    accessToken = initialAccessToken
+  } else {
     accessToken = await login()
   }
 
